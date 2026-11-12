@@ -997,8 +997,7 @@ h1{font-size:clamp(14px,3.8vw,16px)!important;font-weight:400!important;letter-s
   width:100%!important;
   padding:0!important;
 }
-.board-wrap{
-  padding:0!important;
+.board-wrap{  padding:0!important;
   overflow:hidden!important;
   touch-action:none!important;
 }
@@ -1997,8 +1996,7 @@ function scrollBoardToCurrentRow(immediate=false){
    const pitch=multiplierRows.length&gt;=2
       ? multiplierRows[1].getBoundingClientRect().top-multiplierRows[0].getBoundingClientRect().top
       : (viewport.clientWidth * 114/716);
-   const maximum=Math.max(0,viewport.scrollHeight-viewport.clientHeight);
-   const target=Math.max(0,Math.min(maximum,maximum - Math.min(steps,3)*pitch*0.82));
+   const maximum=Math.max(0,viewport.scrollHeight-viewport.clientHeight);   const target=Math.max(0,Math.min(maximum,maximum - Math.min(steps,3)*pitch*0.82));
    if(immediate || window.matchMedia('(prefers-reduced-motion: reduce)').matches){
       viewport.scrollTop=target;return;
    }
@@ -2463,5 +2461,4 @@ function closeIMXPanel(){
   btn.addEventListener('click',e=>{if(moved){e.preventDefault();e.stopPropagation();moved=false;return false;}} , true);
   window.addEventListener('resize',()=>{const x=parseFloat(btn.style.left),y=parseFloat(btn.style.top);if(Number.isFinite(x)&&Number.isFinite(y))applyPos(x,y);savePos();});
   restorePos();
-})();</script></body></html>
 })();</script></body></html>
