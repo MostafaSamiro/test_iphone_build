@@ -13,15 +13,29 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.webkit.ValueCallback;
+import android.webkit.JavascriptInterface;
+import android.provider.OpenableColumns;
+import android.database.Cursor;
+import android.content.ContentResolver;
+import android.os.Handler;
+import android.os.Looper;
+import org.json.JSONObject;
+import com.tom_roush.pdfbox.android.PDFBoxResourceLoader;
+import com.tom_roush.pdfbox.pdmodel.PDDocument;
+import com.tom_roush.pdfbox.text.PDFTextStripper;
+import java.io.InputStream;
+import java.io.ByteArrayOutputStream;
 
 public final class MainActivity extends Activity {
     private static final String HOME = "file:///android_asset/index.html";
     private static final int FILE_REQUEST = 1001;
     private WebView webView;
     private ValueCallback<Uri[]> uploadCallback;
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
+        PDFBoxResourceLoader.init(getApplicationContext());
         getWindow().setStatusBarColor(Color.WHITE);
         getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
         webView = new WebView(this);
@@ -29,6 +43,27 @@ public final class MainActivity extends Activity {
         setContentView(webView);
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
+        webView.addJavascriptInterface(new Object(){
+            @JavascriptInterface public void extractPdf(String uriText){
+                new Thread(() -> {
+                    String result="", error="";
+                    try {
+                        Uri uri=Uri.parse(uriText);
+                        try(InputStream stream=getContentResolver().openInputStream(uri)){
+                            if(stream==null)throw new Exception("تعذر فتح الملف");
+                            try(PDDocument doc=PDDocument.load(stream)){
+                                PDFTextStripper stripper=new PDFTextStripper();
+                                result=stripper.getText(doc);
+                                if(result.trim().isEmpty())error="ملف PDF ممسوح ضوئيًا ولا يحتوي على نص قابل للاستخراج. يحتاج OCR.";
+                            }
+                        }
+                    }catch(Exception ex){error="تعذر قراءة PDF: "+ex.getMessage();}
+                    final String payload=JSONObject.quote(result);
+                    final String failure=JSONObject.quote(error);
+                    mainHandler.post(()->{if(webView!=null)webView.evaluateJavascript("window.onPdfExtracted("+payload+","+failure+")",null);});
+                }).start();
+            }
+        },"NativePdf");
         settings.setDomStorageEnabled(true);
         settings.setAllowFileAccess(true);
         settings.setAllowContentAccess(true);
@@ -70,6 +105,17 @@ public final class MainActivity extends Activity {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == FILE_REQUEST && uploadCallback != null) {
             uploadCallback.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(resultCode, data));
+            if(resultCode==RESULT_OK && data!=null){
+                Uri chosen=data.getData();
+                if(chosen==null && data.getClipData()!=null && data.getClipData().getItemCount()>0)chosen=data.getClipData().getItemAt(0).getUri();
+                if(chosen!=null){
+                    final Uri fileUri=chosen;
+                    String mime=getContentResolver().getType(fileUri);
+                    if("application/pdf".equals(mime)||fileUri.toString().toLowerCase().endsWith(".pdf")){
+                        webView.evaluateJavascript("window.nativeSelectedPdf("+JSONObject.quote(fileUri.toString())+")",null);
+                    }
+                }
+            }
             uploadCallback = null;
         }
     }
