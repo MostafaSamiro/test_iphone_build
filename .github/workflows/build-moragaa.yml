@@ -1,0 +1,45 @@
+name: Build Moragaa Osama Android APK
+on:
+  push:
+    branches:
+      - chatgpt-moragaa-android-build
+    paths:
+      - 'moragaa-osama-android/**'
+      - '.github/workflows/build-moragaa.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+      - name: Install Android SDK platform
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - name: Assemble installable Android application
+        run: gradle -p moragaa-osama-android --no-daemon --stacktrace assembleDebug
+      - name: Stage apk
+        run: |
+          mkdir -p dist
+          cp moragaa-osama-android/app/build/outputs/apk/debug/app-debug.apk dist/Moragaa_Osama.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Moragaa-Osama-APK
+          path: dist/Moragaa_Osama.apk
+          retention-days: 30
+      - name: Commit APK to isolated build branch
+        continue-on-error: true
+        run: |
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git config user.name 'github-actions[bot]'
+          git add -f dist/Moragaa_Osama.apk
+          git commit -m 'Build Moragaa Osama APK' || true
+          git push
