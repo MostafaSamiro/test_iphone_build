@@ -28,6 +28,17 @@ jobs:
         run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
       - name: Assemble installable Android application
         run: gradle -p moragaa-osama-android --no-daemon --stacktrace assembleDebug
+      - name: Verify embedded UI and JavaScript syntax
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          html=Path('moragaa-osama-android/app/src/main/assets/index.html').read_text()
+          assert 'التعليم العالي' in html
+          for name in ['train','refs','bank','errors','notes','exams','ai']:
+              assert f'id="{name}"' in html
+          Path('/tmp/moragaa.js').write_text(html.split('<script>')[1].split('</script>')[0])
+          PY
+          node --check /tmp/moragaa.js
       - name: Stage apk
         run: |
           mkdir -p dist
@@ -45,3 +56,40 @@ jobs:
           git add -f dist/Moragaa_Osama.apk
           git commit -m 'Build Moragaa Osama APK' || true
           git push
+
+  smoke-test:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v4
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+      - name: Install SDK
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - name: Assemble APK for smoke test
+        run: gradle -p moragaa-osama-android --no-daemon assembleDebug
+      - name: Launch app on Android emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 29
+          arch: x86_64
+          profile: pixel_2
+          script: |
+            adb install -r moragaa-osama-android/app/build/outputs/apk/debug/app-debug.apk
+            adb shell am start -n com.osama.altaleemalaali/com.osama.moragaa.MainActivity
+            sleep 10
+            adb shell dumpsys activity activities | grep -q com.osama.altaleemalaali
+            adb shell screencap -p /sdcard/smoke.png
+            adb pull /sdcard/smoke.png smoke.png
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: emulator-smoke-screenshot
+          path: smoke.png
