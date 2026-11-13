@@ -111,7 +111,7 @@ public final class MainActivity extends Activity {
                 if(chosen!=null){
                     final Uri fileUri=chosen;
                     String mime=getContentResolver().getType(fileUri);
-                    if("application/pdf".equals(mime)||fileUri.toString().toLowerCase().endsWith(".pdf")){
+                    String displayName=""; try(Cursor cursor=getContentResolver().query(fileUri,null,null,null,null)){if(cursor!=null && cursor.moveToFirst()){int ix=cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME);if(ix>=0)displayName=cursor.getString(ix);}}catch(Exception ignored){}\n                    if("application/pdf".equalsIgnoreCase(mime)||displayName.toLowerCase().endsWith(".pdf")||fileUri.toString().toLowerCase().endsWith(".pdf")){
                         webView.evaluateJavascript("window.nativeSelectedPdf("+JSONObject.quote(fileUri.toString())+")",null);
                     }
                 }
