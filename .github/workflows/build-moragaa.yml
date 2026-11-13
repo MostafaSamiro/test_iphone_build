@@ -48,6 +48,13 @@ jobs:
           name: Moragaa-Osama-APK
           path: dist/Moragaa_Osama.apk
           retention-days: 30
+      - name: Package Android Studio source
+        run: zip -qr Al_Taleem_Al_Aali_AndroidStudio.zip moragaa-osama-android -x '*/build/*' '*/.gradle/*'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Al-Taleem-AndroidStudio-Source
+          path: Al_Taleem_Al_Aali_AndroidStudio.zip
+          retention-days: 30
       - name: Commit APK to isolated build branch
         continue-on-error: true
         run: |
