@@ -17,8 +17,8 @@ const $=id=>document.getElementById(id),save=()=>{localStorage.setItem('q',JSON.
 for(let id of ['subject','bsubject','fileSubject'])$(id).innerHTML=subjects.map(s=>'<option>'+s+'</option>').join('');
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{document.querySelectorAll('nav button').forEach(x=>x.classList.remove('active'));b.classList.add('active');for(let t of ['train','ai','refs','bank','errors','notes','exams'])$(t).classList.toggle('hidden',t!==b.dataset.tab);render()});
 function openReferences(){const tab=document.querySelector('[data-tab="refs"]');if(tab){tab.click();document.getElementById('refs').scrollIntoView({behavior:'smooth',block:'start'});}else{alert('تعذر فتح المراجع')}}
-function nextQuestion(){let list=questions.filter(q=>q.subject===$('subject').value&&(!($('chapter').value)||q.chapter.includes($('chapter').value))&&(!$('type').value||q.type===$('type').value)&&(!$('difficulty').value||q.difficulty===$('difficulty').value)&&(!mistakesOnly||history[q.id]?.wrong>0));if(!list.length){$('question').textContent='لا توجد أسئلة مطابقة. أضف أسئلة من ملفات المنهج في بنك الأسئلة.';current=null;$('answer').classList.add('hidden');$('msg').textContent='لا يوجد سؤال محفوظ يطابق الفلاتر. افتح بنك الأسئلة وأضف سؤالًا، أو استخرج أسئلة من PDF نصي.';return}let weights=list.flatMap(q=>Array(1+Math.min(history[q.id]?.wrong||0,5)).fill(q));current=weights[Math.floor(Math.random()*weights.length)];$('question').textContent=current.question;$('solution').textContent=current.solution;$('answer').classList.add('hidden');show=false;$('msg').textContent=''}
-function retryMistakes(){mistakesOnly=true;nextQuestion();if(!current)$('msg').textContent='لا توجد أسئلة خاطئة محفوظة لإعادة التدريب.'}
+function nextQuestion(){mistakesOnly=false;pickQuestion()}\nfunction pickQuestion(){let list=questions.filter(q=>q.subject===$('subject').value&&(!($('chapter').value)||(q.chapter||'').includes($('chapter').value))&&(!$('type').value||q.type===$('type').value)&&(!$('difficulty').value||q.difficulty===$('difficulty').value)&&(!mistakesOnly||history[q.id]?.wrong>0));if(!list.length){$('question').textContent='لا توجد أسئلة مطابقة. أضف أسئلة من ملفات المنهج في بنك الأسئلة.';current=null;$('answer').classList.add('hidden');$('msg').textContent='لا يوجد سؤال محفوظ يطابق الفلاتر. افتح بنك الأسئلة وأضف سؤالًا، أو استخرج أسئلة من PDF نصي.';return}let weights=list.flatMap(q=>Array(1+Math.min(history[q.id]?.wrong||0,5)).fill(q));current=weights[Math.floor(Math.random()*weights.length)];$('question').textContent=current.question;$('solution').textContent=current.solution;$('answer').classList.add('hidden');show=false;$('msg').textContent=''}
+function retryMistakes(){mistakesOnly=true;pickQuestion();if(!current)$('msg').textContent='لا توجد أسئلة خاطئة محفوظة لإعادة التدريب.'}
 function showSolution(){if(!current){$('msg').textContent='اختر سؤالًا أولًا.';return;}show=!show;$('answer').classList.toggle('hidden',!show)}
 function markQuestion(wrong){if(!current){$('msg').textContent='لا يوجد سؤال حالي لتسجيل نتيجته.';return;}let h=history[current.id]||{seen:0,wrong:0};h.seen++;if(wrong)h.wrong++;else if(h.wrong>0)h.wrong--;history[current.id]=h;save();$('msg').textContent=wrong?'تمت إضافته لإعادة التدريب':'تم حفظ التقدم';}
 function addQuestion(){if(!$('bquestion').value.trim()||!$('bsolution').value.trim())return alert('اكتب السؤال والحل');questions.push({id:String(Date.now()),subject:$('bsubject').value,chapter:$('bchapter').value,type:$('btype').value,difficulty:$('bdifficulty').value,question:$('bquestion').value.trim(),solution:$('bsolution').value.trim()});save();alert('تم حفظ السؤال في بنك الأسئلة. افتح التدريب واضغط سؤال جديد.');$('bquestion').value='';$('bsolution').value='';render()}
@@ -41,7 +41,7 @@ function prepareCandidates(){
  extractedCandidates=[];
  for(let i=0;i<lines.length;i++){
   let line=lines[i];
-  if(/^(?:Q(?:uestion)?\s*[.:-]?\s*\d+|(?:سؤال|س\s*\d+|تمرين|مثال)\s*[:：.\-]?\s*\d*|\d+\s*[).\-]\s*|\d+\s*[-–]\s*)/i.test(line)||/[؟?]$/.test(line)){
+  if(/^(?:Q(?:uestion)?\s*[.:-]?\s*\d+|(?:سؤال|س\s*\d+|تمرين|مثال)\s*[:：.\-]?\s*\d*|\d+\s*[).\-]\s*|\d+\s*[-–]\s*)/i.test(line)||/[؟?]$/.test(line)||/^(?:find|calculate|solve|determine|evaluate|prove|compute|حل|احسب|أوجد|استنتج|اثبت|برهن)(?:\s|[:：])/i.test(line)){
     let answer=[];for(let j=i+1;j<Math.min(i+12,lines.length);j++){
       if(/^(?:Q(?:uestion)?\s*\d+|(?:سؤال|تمرين)\s*\d+|\d+\s*[).\-]\s*)/i.test(lines[j]))break;
       answer.push(lines[j]);
@@ -55,7 +55,7 @@ function prepareCandidates(){
 function acceptCandidate(i){
  let q=$('candidateQ'+i)?.value.trim(),a=$('candidateA'+i)?.value.trim();
  if(!q||!a)return alert('لا يمكن إضافة السؤال قبل التأكد من وجود سؤال وحل. أكمل الحل يدويًا.');
- questions.push({id:String(Date.now())+'-'+i,subject:$('fileSubject').value,chapter:'',type:'مسائل',difficulty:'متوسط',question:q,solution:a});save();render();alert('تمت إضافة السؤال لبنك الأسئلة بنجاح');
+ questions.push({id:String(Date.now())+'-'+i,subject:$('fileSubject').value,chapter:'',type:'',difficulty:'',question:q,solution:a});save();render();alert('تمت إضافة السؤال لبنك الأسئلة بنجاح. اختر نفس المادة في التدريب واضغط سؤال جديد.');
 }
 function deleteFile(id){if(!confirm('حذف هذا الملف من التطبيق؟'))return;let tx=db.transaction('files','readwrite');tx.objectStore('files').delete(id);tx.oncomplete=renderFiles}
 render();
